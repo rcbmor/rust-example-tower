@@ -16,7 +16,7 @@ async fn main() {
 
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
-        let svc = HelloWorld;
+        let svc = Logging::new(HelloWorld);
         Ok::<_, Infallible>(svc)
     });
 
@@ -29,12 +29,13 @@ async fn main() {
     }
 }
 
+#[derive(Clone, Copy)]
 struct HelloWorld;
 
 impl Service<Request<Body>> for HelloWorld {
     type Response = Response<Body>;
     type Error = Infallible;
-    type Future = futures::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(
         &mut self,
@@ -45,12 +46,35 @@ impl Service<Request<Body>> for HelloWorld {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        Box::pin(async move {
-            log::debug!("received request {} {}", req.method(), req.uri());
-            let response = ready(Ok(Response::new(Body::from("Hello World")))).await;
-            // need to wait for response to be able to log
-            log::debug!("sending response for request {} {}", req.method(), req.uri());
-            response
-        })
+        ready(Ok(Response::new(Body::from("Hello World"))))
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Logging<S> {
+    inner: S,
+}
+
+impl<S> Logging<S> {
+    fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S, B> Service<Request<B>> for Logging<S>
+where
+    S: Service<Request<B>> + Clone,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Request<B>) -> Self::Future {
+        log::debug!("finished processing request {} {}", req.method(), req.uri());
+        self.inner.call(req)
     }
 }
