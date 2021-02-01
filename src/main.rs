@@ -34,7 +34,7 @@ struct HelloWorld;
 impl Service<Request<Body>> for HelloWorld {
     type Response = Response<Body>;
     type Error = Infallible;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = futures::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(
         &mut self,
@@ -45,7 +45,12 @@ impl Service<Request<Body>> for HelloWorld {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        log::debug!("received request {} {}", req.method(), req.uri());
-        ready(Ok(Response::new(Body::from("Hello World"))))
+        Box::pin(async move {
+            log::debug!("received request {} {}", req.method(), req.uri());
+            let response = ready(Ok(Response::new(Body::from("Hello World")))).await;
+            // need to wait for response to be able to log
+            log::debug!("sending response for request {} {}", req.method(), req.uri());
+            response
+        })
     }
 }
