@@ -9,12 +9,15 @@ use tower::Service;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     // Construct our SocketAddr to listen on...
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(HelloWorld)
+        let svc = HelloWorld;
+        Ok::<_, Infallible>(svc)
     });
 
     // Then bind and serve...
@@ -42,6 +45,7 @@ impl Service<Request<Body>> for HelloWorld {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        log::debug!("received request {} {}", req.method(), req.uri());
         ready(Ok(Response::new(Body::from("Hello World"))))
     }
 }
