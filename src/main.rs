@@ -63,18 +63,27 @@ impl<S> Logging<S> {
 
 impl<S, B> Service<Request<B>> for Logging<S>
 where
-    S: Service<Request<B>> + Clone,
+    S: Service<Request<B>> + Clone + Send + 'static,
+    B: 'static + Send,
+    S::Future: 'static + Send
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = futures::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        log::debug!("finished processing request {} {}", req.method(), req.uri());
-        self.inner.call(req)
+        let mut inner = self.inner.clone();
+        Box::pin(async move {
+            let method = req.method().clone();
+            let uri = req.uri().path().to_string();
+            log::debug!("processing request {} {}", method, uri);
+            let response = inner.call(req).await;
+            log::debug!("finished processing request {} {}", method, uri);
+            response
+        })
     }
 }
