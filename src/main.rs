@@ -88,11 +88,12 @@ where
         let path = req.uri().path().to_string();
         log::debug!("processing request {} {} ", method, path);
 
+        let start = Instant::now();
         LoggingFuture {
             future: self.inner.call(req),
             method,
             path,
-            start: Instant::now(),
+            start,
         }
     }
 }
