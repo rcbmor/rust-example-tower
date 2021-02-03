@@ -37,6 +37,7 @@ async fn main() {
 }
 
 async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    tokio::time::sleep(Duration::from_secs(2)).await;
     Ok(Response::new(Body::from("Hello World async fn")))
 }
 
