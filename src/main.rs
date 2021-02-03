@@ -26,6 +26,7 @@ async fn main() {
     let make_service = make_service_fn(|_conn| async {
         //let svc = HelloWorld;
         let svc = service_fn(handle);
+        let svc = Timeout::new(svc, Duration::from_secs(5));
         let svc = Logging::new(svc);
         Ok::<_, Infallible>(svc)
     });
@@ -40,7 +41,7 @@ async fn main() {
 }
 
 async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
     Ok(Response::new(Body::from("Hello World async fn")))
 }
 
