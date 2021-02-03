@@ -16,7 +16,10 @@ async fn main() {
 
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
-        let svc = Logging::new(HelloWorld);
+        let svc = HelloWorld;
+        let svc = Logging::new(svc);
+        let svc = Logging::new(svc);
+        let svc = Logging::new(svc);
         Ok::<_, Infallible>(svc)
     });
 
