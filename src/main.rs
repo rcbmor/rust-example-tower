@@ -15,6 +15,7 @@ use tokio::time::Sleep;
 use tower::BoxError;
 use tower::Layer;
 use tower::Service;
+use tower::ServiceBuilder;
 
 #[tokio::main]
 async fn main() {
@@ -25,11 +26,11 @@ async fn main() {
 
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
-        //let svc = HelloWorld;
-        let svc = service_fn(handle);
-        // the order we wrap services is important!
-        let svc = TimeoutLayer::new(Duration::from_secs(2)).layer(svc);
-        let svc = LoggingLayer::new().layer(svc);
+        // the order we wrap the services is important!
+        let svc = ServiceBuilder::new()
+            .layer(LoggingLayer::new())
+            .layer(TimeoutLayer::new(Duration::from_secs(2)))
+            .service(service_fn(handle));
         Ok::<_, Infallible>(svc)
     });
 
