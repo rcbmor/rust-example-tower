@@ -80,6 +80,7 @@ where
     type Future = LoggingFuture<S::Future>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        log::trace!("polling the future...");
         self.inner.poll_ready(cx)
     }
 
