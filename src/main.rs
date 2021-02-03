@@ -6,6 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use pin_project::pin_project;
 use std::convert::Infallible;
+use std::fmt::Display;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -198,11 +199,18 @@ where
         // then the sleep timeout
         match this.sleep.poll(cx) {
             Poll::Pending => {}
-            Poll::Ready(result) => {
-                todo!()
-            }
+            Poll::Ready(_) => return Poll::Ready(Err(Box::new(Elapsed))),
         }
 
         Poll::Pending
     }
 }
+
+#[derive(Debug)]
+struct Elapsed;
+impl Display for Elapsed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "timeout elapsed")
+    }
+}
+impl std::error::Error for Elapsed {}
