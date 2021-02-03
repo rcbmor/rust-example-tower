@@ -21,7 +21,8 @@ async fn main() {
 
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
-        let svc = HelloWorld;
+        //let svc = HelloWorld;
+        let svc = service_fn(handle);
         let svc = Logging::new(svc);
         Ok::<_, Infallible>(svc)
     });
@@ -33,6 +34,10 @@ async fn main() {
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
     }
+}
+
+async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    Ok(Response::new(Body::from("Hello World async fn")))
 }
 
 #[derive(Clone, Copy)]
@@ -67,7 +72,7 @@ impl<S, B> Service<Request<B>> for Logging<S>
 where
     S: Service<Request<B>> + Clone + Send + 'static,
     B: 'static + Send,
-    S::Future: 'static + Send + Unpin,
+    S::Future: 'static + Send,
 {
     type Response = S::Response;
     type Error = S::Error;
