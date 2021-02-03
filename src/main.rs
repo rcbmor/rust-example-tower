@@ -26,6 +26,7 @@ async fn main() {
     let make_service = make_service_fn(|_conn| async {
         //let svc = HelloWorld;
         let svc = service_fn(handle);
+        // the order we wrap services is important!
         let svc = Timeout::new(svc, Duration::from_secs(5));
         let svc = Logging::new(svc);
         Ok::<_, Infallible>(svc)
@@ -75,7 +76,7 @@ impl<S> Logging<S> {
 
 impl<S, B> Service<Request<B>> for Logging<S>
 where
-    S: Service<Request<B>> + Clone + Send + 'static,
+    S: Service<Request<B>, Response = Response<B>> + Clone + Send + 'static,
     B: 'static + Send,
     S::Future: 'static + Send,
 {
@@ -112,25 +113,36 @@ struct LoggingFuture<F> {
     start: Instant,
 }
 
-impl<F> Future for LoggingFuture<F>
+impl<F, B, E> Future for LoggingFuture<F>
 where
-    F: Future,
+    F: Future<Output = Result<Response<B>, E>>,
 {
-    type Output = F::Output;
+    type Output = Result<Response<B>, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let res: F::Output = match this.future.poll(cx) {
+
+        let res: Result<Response<B>, E> = match this.future.poll(cx) {
             Poll::Ready(res) => res,
             Poll::Pending => return Poll::Pending,
         };
+
         let duration = this.start.elapsed();
+
+        let status = if let Ok(res) = &res {
+            res.status().as_u16()
+        } else {
+            500
+        };
+
         log::debug!(
-            "finisned processing request {} {}. time={:?} ",
+            "finisned processing request {} {}. time={:?}, status={} ",
             this.method,
             this.path,
-            duration
+            duration,
+            status,
         );
+
         Poll::Ready(res)
     }
 }
