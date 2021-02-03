@@ -11,6 +11,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::{future::Future, pin::Pin};
 use tower::Service;
+use tower::BoxError;
 
 #[tokio::main]
 async fn main() {
@@ -128,5 +129,67 @@ where
             duration
         );
         Poll::Ready(res)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Timeout<S> {
+    inner: S,
+    timeout: Duration,
+}
+
+impl<S> Timeout<S> {
+    fn new(inner: S, timeout: Duration) -> Self {
+        Self { inner, timeout }
+    }
+}
+
+impl<S, R> Service<R> for Timeout<S> 
+where
+    S: Service<R>,
+    S::Error: std::error::Error + Send + Sync + 'static,
+
+{
+    type Response = S::Response;
+    type Error = BoxError;
+    type Future = TimeoutFuture<S::Future>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.inner.poll_ready(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(err)) => Poll::Ready(Err(Box::new(err))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn call(&mut self, req: R) -> Self::Future {
+        todo!()
+    }
+
+}
+
+#[pin_project]
+struct TimeoutFuture<F> {
+    #[pin]
+    future: F,
+}
+
+impl<F, T, E> Future for TimeoutFuture<F>
+where
+    F: Future<Output = Result<T, E>>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    type Output = Result<T, BoxError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let result: Result<T, E> = match this.future.poll(cx) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(res) => res,
+        };
+        match result {
+            Ok(res) => Poll::Ready(Ok(res)),
+            Err(err) => Poll::Ready(Err(Box::new(err))),
+        }
     }
 }
