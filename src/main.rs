@@ -10,8 +10,8 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::{future::Future, pin::Pin};
-use tower::Service;
 use tower::BoxError;
+use tower::Service;
 
 #[tokio::main]
 async fn main() {
@@ -144,11 +144,10 @@ impl<S> Timeout<S> {
     }
 }
 
-impl<S, R> Service<R> for Timeout<S> 
+impl<S, R> Service<R> for Timeout<S>
 where
     S: Service<R>,
     S::Error: Into<BoxError> + Send + Sync + 'static,
-
 {
     type Response = S::Response;
     type Error = BoxError;
@@ -158,10 +157,11 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-   fn call(&mut self, req: R) -> Self::Future {
-        todo!()
+    fn call(&mut self, req: R) -> Self::Future {
+        TimeoutFuture {
+            future: self.inner.call(req),
+        }
     }
-
 }
 
 #[pin_project]
