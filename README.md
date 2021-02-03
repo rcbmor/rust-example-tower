@@ -1,7 +1,7 @@
 
 # Rust Example for Tower crate
 Learned from Rust live coding David Pedersen - Tower deep dive
-`https://www.youtube.com/watch?v=16sU1q8OeeI`
+https://www.youtube.com/watch?v=16sU1q8OeeI
 
 # Build
 `cargo build`
