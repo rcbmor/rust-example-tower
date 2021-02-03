@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use std::{future::Future, pin::Pin};
 use tokio::time::Sleep;
 use tower::BoxError;
+use tower::Layer;
 use tower::Service;
 
 #[tokio::main]
@@ -27,8 +28,8 @@ async fn main() {
         //let svc = HelloWorld;
         let svc = service_fn(handle);
         // the order we wrap services is important!
-        let svc = Timeout::new(svc, Duration::from_secs(5));
-        let svc = Logging::new(svc);
+        let svc = TimeoutLayer::new(Duration::from_secs(2)).layer(svc);
+        let svc = LoggingLayer::new().layer(svc);
         Ok::<_, Infallible>(svc)
     });
 
@@ -42,7 +43,7 @@ async fn main() {
 }
 
 async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
     Ok(Response::new(Body::from("Hello World async fn")))
 }
 
@@ -60,6 +61,36 @@ impl Service<Request<Body>> for HelloWorld {
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         ready(Ok(Response::new(Body::from("Hello World"))))
+    }
+}
+
+struct LoggingLayer;
+impl LoggingLayer {
+    fn new() -> Self {
+        Self
+    }
+}
+impl<S> Layer<S> for LoggingLayer {
+    type Service = Logging<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        Logging::new(inner)
+    }
+}
+
+struct TimeoutLayer {
+    timeout: Duration,
+}
+impl TimeoutLayer {
+    fn new(timeout: Duration) -> Self {
+        Self { timeout }
+    }
+}
+impl<S> Layer<S> for TimeoutLayer {
+    type Service = Timeout<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        Timeout::new(inner, self.timeout)
     }
 }
 
