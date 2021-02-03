@@ -77,6 +77,10 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
+        let method = req.method().clone();
+        let path = req.uri().path().to_string();
+        log::debug!("processing request {} {} ", method, path);
+
         LoggingFuture {
             future: self.inner.call(req),
         }
