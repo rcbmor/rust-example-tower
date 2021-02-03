@@ -8,6 +8,7 @@ use pin_project::pin_project;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 use std::{future::Future, pin::Pin};
 use tower::Service;
 
@@ -105,11 +106,18 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
+        let start = Instant::now();
         let res: F::Output = match this.future.poll(cx) {
             Poll::Ready(res) => res,
             Poll::Pending => return Poll::Pending,
         };
-        log::debug!("finisned processing request {} {} ", this.method, this.path);
+        let duration = start.elapsed();
+        log::debug!(
+            "finisned processing request {} {}. time={:?} ",
+            this.method,
+            this.path,
+            duration
+        );
         Poll::Ready(res)
     }
 }
