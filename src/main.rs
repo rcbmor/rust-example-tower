@@ -147,7 +147,7 @@ impl<S> Timeout<S> {
 impl<S, R> Service<R> for Timeout<S> 
 where
     S: Service<R>,
-    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Error: Into<BoxError> + Send + Sync + 'static,
 
 {
     type Response = S::Response;
@@ -155,14 +155,10 @@ where
     type Future = TimeoutFuture<S::Future>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.inner.poll_ready(cx) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(err)) => Poll::Ready(Err(Box::new(err))),
-            Poll::Pending => Poll::Pending,
-        }
+        self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: R) -> Self::Future {
+   fn call(&mut self, req: R) -> Self::Future {
         todo!()
     }
 
@@ -177,7 +173,7 @@ struct TimeoutFuture<F> {
 impl<F, T, E> Future for TimeoutFuture<F>
 where
     F: Future<Output = Result<T, E>>,
-    E: std::error::Error + Send + Sync + 'static,
+    E: Into<BoxError> + Send + Sync + 'static,
 {
     type Output = Result<T, BoxError>;
 
@@ -189,7 +185,7 @@ where
         };
         match result {
             Ok(res) => Poll::Ready(Ok(res)),
-            Err(err) => Poll::Ready(Err(Box::new(err))),
+            Err(err) => Poll::Ready(Err(err.into())),
         }
     }
 }
