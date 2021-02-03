@@ -24,13 +24,24 @@ async fn main() {
     // Construct our SocketAddr to listen on...
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
+    let base_layer = ServiceBuilder::new()
+        .layer(LoggingLayer::new())
+        .layer(TimeoutLayer::new(Duration::from_secs(2)))
+        .into_inner();
+
+    let limit_layer = ServiceBuilder::new()
+        .rate_limit(100, Duration::from_secs(1))
+        .concurrency_limit(1000)
+        .into_inner();
+
     // And a MakeService to handle each connection...
     let make_service = make_service_fn(|_conn| async {
         // the order we wrap the services is important!
         let svc = ServiceBuilder::new()
-            .layer(LoggingLayer::new())
-            .layer(TimeoutLayer::new(Duration::from_secs(2)))
+            .layer(base_layer)
+            .layer(limit_layer)
             .service(service_fn(handle));
+
         Ok::<_, Infallible>(svc)
     });
 
