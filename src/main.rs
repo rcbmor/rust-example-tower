@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::{future::Future, pin::Pin};
+use tokio::time::Sleep;
 use tower::BoxError;
 use tower::Service;
 
@@ -160,6 +161,7 @@ where
     fn call(&mut self, req: R) -> Self::Future {
         TimeoutFuture {
             future: self.inner.call(req),
+            sleep: tokio::time::sleep(self.timeout),
         }
     }
 }
@@ -168,6 +170,8 @@ where
 struct TimeoutFuture<F> {
     #[pin]
     future: F,
+    #[pin]
+    sleep: Sleep,
 }
 
 impl<F, T, E> Future for TimeoutFuture<F>
@@ -179,13 +183,26 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let result: Result<T, E> = match this.future.poll(cx) {
-            Poll::Pending => return Poll::Pending,
-            Poll::Ready(res) => res,
-        };
-        match result {
-            Ok(res) => Poll::Ready(Ok(res)),
-            Err(err) => Poll::Ready(Err(err.into())),
+
+        // first the future itself
+        match this.future.poll(cx) {
+            Poll::Pending => {}
+            Poll::Ready(result) => {
+                return match result {
+                    Ok(res) => Poll::Ready(Ok(res)),
+                    Err(err) => Poll::Ready(Err(err.into())),
+                }
+            }
         }
+
+        // then the sleep timeout
+        match this.sleep.poll(cx) {
+            Poll::Pending => {}
+            Poll::Ready(result) => {
+                todo!()
+            }
+        }
+
+        Poll::Pending
     }
 }
