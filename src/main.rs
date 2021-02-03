@@ -92,6 +92,7 @@ where
             future: self.inner.call(req),
             method,
             path,
+            start: Instant::now(),
         }
     }
 }
@@ -102,6 +103,7 @@ struct LoggingFuture<F> {
     future: F,
     method: hyper::Method,
     path: String,
+    start: Instant,
 }
 
 impl<F> Future for LoggingFuture<F>
@@ -112,12 +114,11 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let start = Instant::now();
         let res: F::Output = match this.future.poll(cx) {
             Poll::Ready(res) => res,
             Poll::Pending => return Poll::Pending,
         };
-        let duration = start.elapsed();
+        let duration = this.start.elapsed();
         log::debug!(
             "finisned processing request {} {}. time={:?} ",
             this.method,
