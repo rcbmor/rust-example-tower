@@ -83,6 +83,8 @@ where
 
         LoggingFuture {
             future: self.inner.call(req),
+            method,
+            path,
         }
     }
 }
@@ -91,6 +93,8 @@ where
 struct LoggingFuture<F> {
     #[pin]
     future: F,
+    method: hyper::Method,
+    path: String,
 }
 
 impl<F> Future for LoggingFuture<F>
@@ -100,6 +104,12 @@ where
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.project().future.poll(cx)
+        let this = self.project();
+        let res: F::Output = match this.future.poll(cx) {
+            Poll::Ready(res) => res,
+            Poll::Pending => return Poll::Pending,
+        };
+        log::debug!("finisned processing request {} {} ", this.method, this.path);
+        Poll::Ready(res)
     }
 }
